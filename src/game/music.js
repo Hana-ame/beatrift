@@ -9,19 +9,58 @@ const TIMER_MS = 20;
 const F = {
   A2: 110, A3: 220, A4: 440, C3: 130.81, C4: 261.63, E3: 164.81, E4: 329.63,
   F2: 87.31, F3: 174.61, F4: 349.23, G2: 98, G3: 196, G4: 392,
-  B3: 246.94, D4: 293.66,
+  B3: 246.94, D4: 293.66, E2: 82.41, G2b: 92.5, D3: 146.83, A2d: 103.83,
 };
 
 const PENTA = [F.A3, F.C4, F.D4, F.E4, F.G4, F.A4, 0, F.G4, F.E4, F.D4, F.C4, F.A3];
+const PENTA_DARK = [F.A3, F.C4, F.E4, F.G3, F.B3, F.D4, 0, F.D4, F.B3, F.G3, F.E4, F.C4];
+const PENTA_DEEP = [F.D3, F.F3, F.A3, F.C4, F.E4, 0, F.E4, F.C4, F.A3, F.F3, F.D3];
 
-const CHORDS = [
-  [F.A2, F.A3, F.C4, F.E4],
-  [F.F2, F.F3, F.A3, F.C4],
-  [F.C3, F.C4, F.E4, F.G4],
-  [F.G2, F.G3, F.B3, F.D4],
-];
+// 三首歌 = 三种合成风格, 每首有独立的和声/旋律/节奏密度
+const STYLES = {
+  pulse: {
+    chords: [
+      [F.A2, F.A3, F.C4, F.E4],
+      [F.F2, F.F3, F.A3, F.C4],
+      [F.C3, F.C4, F.E4, F.G4],
+      [F.G2, F.G3, F.B3, F.D4],
+    ],
+    penta: PENTA,
+    hatEvery: 2,       // 16分step里每几个一踩(2=半拍)
+    arpDensity: [1, 1, 2, 2],
+    bassEvery: 2,
+    bassOctave: 0,
+  },
+  rush: {
+    chords: [
+      [F.A2, F.A3, F.C4, F.E4],
+      [F.E2, F.E3, F.G3, F.B3],
+      [F.F2, F.F3, F.A3, F.C4],
+      [F.G2, F.G3, F.B3, F.D4],
+    ],
+    penta: PENTA_DARK,
+    hatEvery: 1,       // 16分踩镲, 更碎
+    arpDensity: [2, 2, 3, 3],
+    bassEvery: 2,
+    bassOctave: 1,
+  },
+  void: {
+    chords: [
+      [F.D2, F.D3, F.F3, F.A3],
+      [F.A2, F.A3, F.C4, F.E4],
+      [F.G2, F.G3, F.B3, F.D4],
+      [F.C3, F.C4, F.E4, F.G4],
+    ],
+    penta: PENTA_DEEP,
+    hatEvery: 4,       // 稀疏
+    arpDensity: [0, 1, 1, 2],
+    bassEvery: 4,
+    bassOctave: 0,
+  },
+};
 
-function buildPattern() {
+function buildPattern(styleName) {
+  const st = STYLES[styleName] || STYLES.pulse;
   const steps = Array.from({ length: PATTERN_LEN }, () => []);
   const step = (i, e) => steps[i % PATTERN_LEN].push(e);
 
@@ -36,33 +75,33 @@ function buildPattern() {
       // 军鼓 on 2 & 4
       if (s === 4 || s === 12) step(base + s, { type: 'snare' });
 
-      // 闭镲每半拍, 开镲点缀
-      if (s % 2 === 0) step(base + s, { type: 'hat' });
+      // 踩镲按风格密度
+      if (s % st.hatEvery === 0) step(base + s, { type: 'hat' });
       if (s === 14 && (bar % 2 === 0)) step(base + s, { type: 'hat-open' });
     }
 
-    // 贝斯: 8分音符根音
-    const [root, fifth] = [CHORDS[bar][0], CHORDS[bar][2] / 2];
-    for (let s = 0; s < STEPS_PER_BAR; s += 2) {
+    // 贝斯
+    const [root, fifth] = [st.chords[bar][0], st.chords[bar][2] / 2 / Math.pow(2, st.bassOctave)];
+    for (let s = 0; s < STEPS_PER_BAR; s += st.bassEvery) {
       step(base + s, { type: 'bass', note: s % 4 === 2 ? fifth : root });
     }
 
-    // 琶音旋律: 16分音符, 密度渐增
-    const density = 1 + Math.floor(bar / 2); // bar0:1 bar1:1 bar2:2 bar3:2
+    // 琶音旋律
+    const density = st.arpDensity[Math.min(bar, st.arpDensity.length - 1)];
     for (let s = 0; s < STEPS_PER_BAR; s++) {
       if (s % Math.max(1, 4 / density) === 0 && Math.random() < 0.85) {
-        step(base + s, { type: 'arp', note: PENTA[(s + bar * 3) % PENTA.length], bar });
+        step(base + s, { type: 'arp', note: st.penta[(s + bar * 3) % st.penta.length], bar });
       }
     }
   }
   return steps;
 }
 
-const PATTERN = buildPattern();
-
 export class Music {
-  constructor(bpm = GAME.BPM) {
+  constructor(bpm = GAME.BPM, style = 'pulse') {
     this.bpm = bpm;
+    this.style = style;
+    this.pattern = buildPattern(style);
     this.ctx = null;
     this.master = null;
     this.started = false;
@@ -74,6 +113,9 @@ export class Music {
     this._onBar = null;
     this._startCtxTime = 0;
     this.songTime = 0;
+    this.songBuffer = null;
+    this.songUrl = null;
+    this._songSource = null;
   }
 
   start({ onStep, onBar } = {}) {
@@ -94,7 +136,41 @@ export class Music {
     this._nextTime = this.ctx.currentTime + 0.06;
     this._startCtxTime = this.ctx.currentTime;
 
+    // 有真实音频(外链下载)就播放它, 否则走合成模式
+    if (this.songBuffer) {
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.songBuffer;
+      src.loop = true;
+      src.connect(this.master);
+      src.start(this._nextTime);
+      this._songSource = src;
+    }
+
     this._timer = setInterval(() => this._tick(), TIMER_MS);
+  }
+
+  // 在线下载/外链方式加载并解码歌曲; 失败返回 false, 调用方回退合成
+  async loadSong(url) {
+    this.songUrl = url;
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC({ latencyHint: 'interactive' });
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.9;
+      this.master.connect(this.ctx.destination);
+    }
+    try {
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error(`song fetch ${res.status}`);
+      const buf = await res.arrayBuffer();
+      const audio = await this.ctx.decodeAudioData(buf);
+      this.songBuffer = audio;
+      return true;
+    } catch (e) {
+      console.warn('[music] 外链加载失败, 回退合成:', e.message);
+      this.songBuffer = null;
+      return false;
+    }
   }
 
   stop() {
@@ -138,7 +214,8 @@ export class Music {
   }
 
   _scheduleStep(step, t) {
-    const events = PATTERN[step % PATTERN_LEN];
+    if (this._songSource) return; // 有真实歌曲时静音合成器
+    const events = this.pattern[step % PATTERN_LEN];
     for (const e of events) {
       switch (e.type) {
         case 'kick': this._kick(t); break;

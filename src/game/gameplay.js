@@ -12,18 +12,20 @@ const HIT_RADIUS = 1.2;
 
 const COLORS = [0x4de3ff, 0xff2d78, 0xffd166, 0xb06dff, 0x3ddc84, 0xff8a3d, 0x66b3ff, 0xff5c8a, 0x9af0c0];
 
-// 谱面: JSON 数组 { beat, x, y }, beat 为该音符到达判定平面的拍数,
-// x 为判定平面上的水平坐标, y 为竖直坐标 (世界系 z-up, 平面在 y=NOTE_PLANE_Y)。
+// 谱面: 可以是数组 [{beat,x,y,color?}] 或对象 { song:{name,bpm,synth?,url?}, notes:[...] }
+// beat 为该音符到达判定平面的拍数, x 为判定平面上的水平坐标, y 为竖直坐标 (世界系 z-up)。
 export async function loadChart(name = 'default') {
   const res = await fetch(`/charts/${name}.json`);
   if (!res.ok) throw new Error(`谱面加载失败: charts/${name}.json (${res.status})`);
   const raw = await res.json();
-  return raw.map((n) => ({
+  const meta = Array.isArray(raw) ? { notes: raw } : raw;
+  const notes = (meta.notes || []).map((n) => ({
     beat: n.beat,
     step: n.beat * 4,
     pos: new THREE.Vector3(n.x, GAME.NOTE_PLANE_Y, n.y),
     color: n.color ?? pickColor(n.x),
   }));
+  return { song: meta.song ?? null, notes };
 }
 
 export function pickColor(x) {

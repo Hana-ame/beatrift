@@ -34,6 +34,14 @@
           </div>
           <canvas id="pc-qr" width="256" height="256"></canvas>
           <p class="hint">手机扫二维码或输入房间码连接; 也可见于下方设备列表</p>
+          <div class="song-row">
+            <div class="devices-title">选歌</div>
+            <div class="song-btns">
+              <button class="btn btn-small song-btn" data-song="pulse">霓虹脉冲</button>
+              <button class="btn btn-small song-btn" data-song="rush">激光冲刺</button>
+              <button class="btn btn-small song-btn" data-song="void">深空回响</button>
+            </div>
+          </div>
           <div id="pc-devices" class="devices hidden">
             <div class="devices-title">正在等待设备…</div>
           </div>
@@ -74,6 +82,7 @@
           <div class="calib-card calib2-card">
             <h2 class="section-title">校准光剑</h2>
             <p class="hint">像握光剑般手持手机, 手机顶边指向屏幕; 光剑应指向屏幕内部。</p>
+            <div id="calib-song" class="hint calib-song">歌曲: --</div>
             <div class="flip-row">
               <button id="calib-fx" data-flip="x" class="btn btn-small flip-btn">反转左右</button>
               <button id="calib-fy" data-flip="y" class="btn btn-small flip-btn">反转上下</button>

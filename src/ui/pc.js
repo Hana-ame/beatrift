@@ -5,7 +5,7 @@ import { createHost } from '../net/connection.js';
 import { P } from '../net/protocol.js';
 import { buildJoinUrl } from '../net/joinUrl.js';
 import QRCode from 'qrcode';
-import { startGame, handleMotion, handleControl } from '../game/index.js';
+import { startGame, handleMotion, handleControl, SONGS } from '../game/index.js';
 
 export function initPc() {
   const els = {
@@ -21,6 +21,15 @@ export function initPc() {
   let cleanupAnnounce = null;
   let connected = false;
   let diff = null;
+  let song = 'pulse';
+
+  const songBtns = [...document.querySelectorAll('.song-btn')];
+  const setSong = (id) => {
+    song = id;
+    songBtns.forEach((b) => b.classList.toggle('active', b.dataset.song === id));
+  };
+  songBtns.forEach((b) => b.addEventListener('click', () => setSong(b.dataset.song)));
+  setSong(song);
 
   const setStatus = (text, ok) => {
     els.status.textContent = text;
@@ -72,7 +81,7 @@ export function initPc() {
         els.devices.innerHTML = `<div class="device-item"><span>手机已连接</span><span class="dot on"></span></div>`;
         els.start.disabled = false;
         setStatus('已连接, 校准光剑中…', true);
-        startGame({ host, roomCode, diff, calibrate: true });
+        startGame({ host, roomCode, diff, song, calibrate: true });
         showScreen('screen-game');
       },
       onControl(msg) {
@@ -96,7 +105,7 @@ export function initPc() {
   function onStart() {
     if (!connected || !host) return;
     host.sendControl({ t: P.START, bpm: GAME.BPM });
-    startGame({ host, roomCode, diff });
+    startGame({ host, roomCode, diff, song });
     showScreen('screen-game');
   }
 

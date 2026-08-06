@@ -172,6 +172,12 @@ html, body {
 .diff-btn { margin-top: 0; min-width: 64px; }
 .diff-btn.active { border-color: var(--accent); color: var(--accent-3); box-shadow: 0 0 10px rgba(255, 45, 120, 0.35); }
 
+.song-row { margin: 12px 0 6px; }
+.song-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.song-btn { min-width: 96px; }
+.song-btn.active { border-color: var(--accent); color: var(--accent-3); box-shadow: 0 0 10px rgba(255, 45, 120, 0.35); }
+.calib-song { margin: 4px 0 8px; font-weight: 700; color: var(--accent-3); }
+
 .calib2-dir {
   font-size: 44px;
   font-weight: 800;

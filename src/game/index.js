@@ -12,6 +12,13 @@ import { shortestArc, qRotate } from '../../lib/attitude.js';
 const INTO = { x: 0, y: -1, z: 0 }; // 屏幕内部方向 (剑尖基准朝此, 水平, 与重力垂直)
 const NEUTRAL = { x: 0, y: 0, z: 1 };
 
+// 三首歌 (游戏内可切换), 每首对应一张谱面文件
+export const SONGS = [
+  { id: 'pulse', name: '霓虹脉冲', file: 'song1', bpm: 128, synth: 'pulse' },
+  { id: 'rush', name: '激光冲刺', file: 'song2', bpm: 150, synth: 'rush' },
+  { id: 'void', name: '深空回响', file: 'song3', bpm: 96, synth: 'void' },
+];
+
 let ctx = null;
 let lastDir = NEUTRAL;
 let calibState = { mapQ: null, refTop: null, flips: { x: 1, y: 1, z: 1 }, top: null };
@@ -49,15 +56,16 @@ export function handleControl(msg) {
   if (msg.t === P.START) startGame({ host: ctx?.host, roomCode: ctx?.roomCode, bpm: msg.bpm });
 }
 
-export async function startGame({ host, roomCode, bpm, diff, calibrate = false, keepCalib = false }) {
+export async function startGame({ host, roomCode, bpm, diff, calibrate = false, keepCalib = false, song }) {
   cleanup();
   ctx = { host, roomCode, bpm };
   if (!keepCalib) calibState = { mapQ: null, ref: null, flips: { x: 1, y: 1, z: 1 }, top: null };
   let calibDiff = diff ?? 'normal';
 
+  const selected = SONGS.find((s) => s.id === song) || null;
   let chart = null;
   try {
-    chart = await loadChart();
+    chart = await loadChart(selected ? selected.file : 'default');
   } catch (e) {
     console.warn(e);
   }
@@ -66,7 +74,11 @@ export async function startGame({ host, roomCode, bpm, diff, calibrate = false, 
   const app = createGameScene(canvas);
   const fx = new Fx(app.scene, app.camera);
   const physics = new ShardPhysics();
-  const music = new Music(bpm || GAME.BPM);
+  const songBpm = chart?.song?.bpm || selected?.bpm || bpm || GAME.BPM;
+  const songSynth = chart?.song?.synth || selected?.synth || 'pulse';
+  const music = new Music(songBpm, songSynth);
+  const calibSongEl = document.querySelector('#calib-song');
+  if (calibSongEl) calibSongEl.textContent = `歌曲: ${chart?.song?.name || selected?.name || '默认'}`;
   const hud = bindHud();
   const popup = bindPopup();
 
@@ -76,7 +88,7 @@ export async function startGame({ host, roomCode, bpm, diff, calibrate = false, 
   };
 
   const game = new Game({ scene: app, music, fx, physics, popup, hud, onEnd, diff: calibDiff });
-  if (chart) game.setChart(chart);
+  if (chart?.notes?.length) game.setChart(chart.notes);
   ctx.game = game;
   ctx.app = app;
   ctx.fx = fx;
@@ -119,16 +131,18 @@ export async function startGame({ host, roomCode, bpm, diff, calibrate = false, 
   const setFrontBtn = calibOv?.querySelector('#calib-setfront');
   setFrontBtn?.addEventListener('click', () => { setFront(); });
 
-  const beginPlay = () => {
+  const beginPlay = async () => {
     if (!ctx) return;
     ctx.calibrating = false;
     if (ctx.game) ctx.game.calibrating = false;
     calibOv?.classList.add('hidden');
     document.querySelector('#hud').classList.remove('hidden');
     document.querySelector('#end-overlay').classList.add('hidden');
+    // 外链歌曲: 先在线下载/解码; 失败自动回退合成(loadSong 内部处理)
+    if (chart?.song?.url) await music.loadSong(chart.song.url);
     music.start({ onStep: () => {} });
     hud.update({ score: 0, combo: 0, lives: GAME.LIVES, perfect: 0, good: 0, misses: 0 });
-    host?.sendControl({ t: P.START, bpm: GAME.BPM });
+    host?.sendControl({ t: P.START, bpm: songBpm });
   };
   const startBtn = calibOv?.querySelector('#calib-start');
   startBtn?.addEventListener('click', beginPlay);
