@@ -120,7 +120,10 @@ function createNoteScreen(scene) {
     }),
   );
   mesh.position.set(0, NOTE_SPAWN_Y, 0);
-  mesh.rotation.x = -Math.PI / 2;
+  // 先绕 X 轴立起使平面法线指向 +y(玩家), 再绕法线旋转 180° 让文字朝上
+  mesh.quaternion
+    .setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
+    .multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)));
   mesh.frustumCulled = false;
   scene.add(mesh);
   return mesh;
