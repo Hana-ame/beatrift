@@ -5,6 +5,7 @@ const SWORD_PIVOT = new THREE.Vector3(0, 0.5, 1.4);
 const SWORD_LEN = 5.6;
 const SWORD_OFFSET = 0.7;
 const TRAIL_LEN = 14;
+const NOTE_SPAWN_Y = -56;
 
 export function createGameScene(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -35,6 +36,7 @@ export function createGameScene(canvas) {
   scene.add(key);
 
   addStars(scene);
+  createNoteScreen(scene);
 
   const sword = createSword();
   scene.add(sword.group);
@@ -88,6 +90,40 @@ function addStars(scene) {
   scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
     color: 0x8899ff, size: 0.08, transparent: true, opacity: 0.7,
   })));
+}
+
+function createNoteScreen(scene) {
+  const cv = document.createElement('canvas');
+  cv.width = 1024;
+  cv.height = 384;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#0b0b1a';
+  g.fillRect(0, 0, cv.width, cv.height);
+  g.strokeStyle = '#4de3ff';
+  g.lineWidth = 10;
+  g.strokeRect(16, 16, cv.width - 32, cv.height - 32);
+  g.fillStyle = '#9ff6ff';
+  g.font = 'bold 96px "PingFang SC","Microsoft YaHei",sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('此面向敌', cv.width / 2, cv.height / 2);
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.anisotropy = 4;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(14, 5.2),
+    new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0.95,
+      side: THREE.DoubleSide,
+    }),
+  );
+  mesh.position.set(0, NOTE_SPAWN_Y, 0);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  return mesh;
 }
 
 function createSword() {
