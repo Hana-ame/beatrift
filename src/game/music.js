@@ -9,7 +9,7 @@ const TIMER_MS = 20;
 const F = {
   A2: 110, A3: 220, A4: 440, C3: 130.81, C4: 261.63, E3: 164.81, E4: 329.63,
   F2: 87.31, F3: 174.61, F4: 349.23, G2: 98, G3: 196, G4: 392,
-  B3: 246.94, D4: 293.66, E2: 82.41, G2b: 92.5, D3: 146.83, A2d: 103.83,
+  B3: 246.94, D4: 293.66, D2: 73.42, E2: 82.41, G2b: 92.5, D3: 146.83, A2d: 103.83,
 };
 
 const PENTA = [F.A3, F.C4, F.D4, F.E4, F.G4, F.A4, 0, F.G4, F.E4, F.D4, F.C4, F.A3];
@@ -285,6 +285,7 @@ export class Music {
   }
 
   _bass(t, freq) {
+    if (!isFinite(freq)) return;
     const o = this.ctx.createOscillator();
     const lpf = this.ctx.createBiquadFilter();
     const g = this.ctx.createGain();
