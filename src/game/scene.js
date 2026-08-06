@@ -36,7 +36,7 @@ export function createGameScene(canvas) {
   scene.add(key);
 
   addStars(scene);
-  createNoteScreen(scene);
+  const noteScreen = createNoteScreen(scene);
 
   const sword = createSword();
   scene.add(sword.group);
@@ -64,6 +64,7 @@ export function createGameScene(canvas) {
     sword,
     trail,
     notePool,
+    noteScreen,
     getSword() {
       const dir = new THREE.Vector3(0, 1, 0).applyQuaternion(sword.group.quaternion);
       const tip = SWORD_PIVOT.clone().addScaledVector(dir, SWORD_LEN);

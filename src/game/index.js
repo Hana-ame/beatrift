@@ -135,6 +135,7 @@ export async function startGame({ host, roomCode, bpm, diff, calibrate = false, 
     if (!ctx) return;
     ctx.calibrating = false;
     if (ctx.game) ctx.game.calibrating = false;
+    if (ctx.app?.noteScreen) ctx.app.noteScreen.visible = false;
     calibOv?.classList.add('hidden');
     document.querySelector('#hud').classList.remove('hidden');
     document.querySelector('#end-overlay').classList.add('hidden');
@@ -201,13 +202,15 @@ export async function startGame({ host, roomCode, bpm, diff, calibrate = false, 
     document.querySelector('#end-exit')?.removeEventListener('click', onEndExit);
   };
 
-  window.__beatriftDebug = {
-    getGame: () => ctx?.game,
-    getMusic: () => ctx?.music,
-    handleMotion,
-    setFront,
-    toggleFlip,
-  };
+  if (import.meta.env.DEV) {
+    window.__beatriftDebug = {
+      getGame: () => ctx?.game,
+      getMusic: () => ctx?.music,
+      handleMotion,
+      setFront,
+      toggleFlip,
+    };
+  }
 }
 
 export function cleanup() {

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
+import obfuscator from 'javascript-obfuscator';
 
 const versionUrl = new URL('./src/version.js', import.meta.url);
 function writeVersion() {
@@ -31,8 +32,41 @@ function versionPlugin() {
   };
 }
 
+// 只混淆主入口 chunk(app 自身逻辑: 网络协议/MQTT 地址/谱面常量等),
+// vendor(three/cannon/peerjs/mqtt)与调试页(test/ahrs/sword)不动, 避免体积与风险。
+function obfuscateMain() {
+  const opts = {
+    compact: true,
+    controlFlowFlattening: false,
+    deadCodeInjection: false,
+    identifierNamesGenerator: 'hexadecimal',
+    renameGlobals: false,
+    selfDefending: false,
+    simplify: true,
+    stringArray: true,
+    stringArrayEncoding: ['base64'],
+    stringArrayThreshold: 0.8,
+    splitStrings: true,
+    splitStringsChunkLength: 8,
+    transformObjectKeys: false,
+    unicodeEscapeSequence: false,
+    target: 'es2020',
+  };
+  return {
+    name: 'obfuscate-main',
+    enforce: 'post',
+    generateBundle(_out, bundle) {
+      for (const [name, chunk] of Object.entries(bundle)) {
+        if (chunk.type !== 'chunk') continue;
+        if (!name.startsWith('browser')) continue;
+        chunk.code = obfuscator.obfuscate(chunk.code, opts).getObfuscatedCode();
+      }
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [versionPlugin()],
+  plugins: [versionPlugin(), obfuscateMain()],
   server: {
     host: true,
     port: 5173,
@@ -40,6 +74,12 @@ export default defineConfig({
   },
   build: {
     target: 'es2020',
+    minify: 'terser',
+    terserOptions: {
+      compress: { passes: 2, drop_console: true },
+      mangle: {},
+      format: { comments: false },
+    },
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),

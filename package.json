@@ -18,7 +18,9 @@
     "three": "^0.169.0"
   },
   "devDependencies": {
+    "javascript-obfuscator": "^5.5.0",
     "playwright": "^1.47.0",
+    "terser": "^5.49.2",
     "vite": "^5.4.8"
   }
 }
