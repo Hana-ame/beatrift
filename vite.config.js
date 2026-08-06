@@ -32,33 +32,47 @@ function versionPlugin() {
   };
 }
 
-// 只混淆主入口 chunk(app 自身逻辑: 网络协议/MQTT 地址/谱面常量等),
-// vendor(three/cannon/peerjs/mqtt)与调试页(test/ahrs/sword)不动, 避免体积与风险。
-function obfuscateMain() {
+// 生产混淆: 只混淆"app 自身逻辑"chunk(pc/mobile/connection/constants/attitude 等 src|lib 源码)。
+// 按模块来源过滤(非 chunk 名前缀):
+//   排除 = chunk.isEntry(入口) / 模块含 node_modules(vendor) / \0 虚拟模块(vite runtime) / test|ahrs|sword(调试页)
+//   只混淆 = 模块 100% 来自项目 src/ 或 lib/ 的 chunk
+// renameGlobals/selfDefending 必须为 false, 否则跨 chunk 引用断裂 / DevTools 卡死。
+function obfuscateApp() {
   const opts = {
     compact: true,
-    controlFlowFlattening: false,
+    controlFlowFlattening: true,
+    controlFlowFlatteningThreshold: 0.3,
     deadCodeInjection: false,
     identifierNamesGenerator: 'hexadecimal',
+    numbersToExpressions: true,
     renameGlobals: false,
     selfDefending: false,
     simplify: true,
     stringArray: true,
     stringArrayEncoding: ['base64'],
-    stringArrayThreshold: 0.8,
+    stringArrayThreshold: 1.0,
     splitStrings: true,
     splitStringsChunkLength: 8,
     transformObjectKeys: false,
     unicodeEscapeSequence: false,
-    target: 'es2020',
+    target: 'browser',
   };
   return {
-    name: 'obfuscate-main',
+    name: 'obfuscate-app',
     enforce: 'post',
     generateBundle(_out, bundle) {
+      const proj = process.cwd();
+      const isAppModule = (p) =>
+        p.startsWith(proj) &&
+        !p.includes('node_modules') &&
+        !/\b(?:test|ahrs|sword)\//.test(p) &&
+        !p.startsWith('\0');
       for (const [name, chunk] of Object.entries(bundle)) {
         if (chunk.type !== 'chunk') continue;
-        if (!name.startsWith('browser')) continue;
+        if (chunk.isEntry) continue;
+        const mods = Object.keys(chunk.modules || {});
+        if (!mods.length) continue;
+        if (!mods.every(isAppModule)) continue;
         chunk.code = obfuscator.obfuscate(chunk.code, opts).getObfuscatedCode();
       }
     },
@@ -66,7 +80,7 @@ function obfuscateMain() {
 }
 
 export default defineConfig({
-  plugins: [versionPlugin(), obfuscateMain()],
+  plugins: [versionPlugin(), obfuscateApp()],
   server: {
     host: true,
     port: 5173,
@@ -76,7 +90,7 @@ export default defineConfig({
     target: 'es2020',
     minify: 'terser',
     terserOptions: {
-      compress: { passes: 2, drop_console: true },
+      compress: { passes: 3, drop_console: true },
       mangle: {},
       format: { comments: false },
     },
