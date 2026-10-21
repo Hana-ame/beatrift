@@ -2,7 +2,7 @@ const $ = (sel) => document.querySelector(sel);
 
 export function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.add('hidden'));
-  $(`#${id}`).classList.remove('hidden');
+  $(`#${id}`)?.classList.remove('hidden');
 }
 
 export function parseRoute() {
@@ -17,14 +17,14 @@ export function navigate(hash) {
 }
 
 let bound = false;
-export function bindRoleButtons({ onPc, onMobile }) {
+export function bindRoleButtons({ onPc, onMobile } = {}) {
   if (bound) return;
   bound = true;
-  $('#btn-pc').addEventListener('click', () => {
+  $('#btn-pc')?.addEventListener('click', () => {
     navigate('/pc');
     onPc?.();
   });
-  $('#btn-mobile').addEventListener('click', () => {
+  $('#btn-mobile')?.addEventListener('click', () => {
     navigate('/mobile');
     onMobile?.();
   });

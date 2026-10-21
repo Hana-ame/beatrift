@@ -32,24 +32,31 @@ export class Sensor {
   }
 
   async requestPermission() {
+    if (this.forceSim) return true;
     const withTimeout = (p) => Promise.race([p, new Promise((r) => setTimeout(() => r('denied'), 1500))]);
-    if (window.DeviceMotionEvent && typeof window.DeviceMotionEvent.requestPermission === 'function') {
-      try {
-        return (await withTimeout(window.DeviceMotionEvent.requestPermission())) === 'granted';
-      } catch {
-        return false;
+    try {
+      if (window.DeviceMotionEvent && typeof window.DeviceMotionEvent.requestPermission === 'function') {
+        const res = await withTimeout(window.DeviceMotionEvent.requestPermission());
+        if (res !== 'granted') return false;
       }
+      if (window.DeviceOrientationEvent && typeof window.DeviceOrientationEvent.requestPermission === 'function') {
+        const res = await withTimeout(window.DeviceOrientationEvent.requestPermission());
+        if (res !== 'granted') return false;
+      }
+      return true;
+    } catch {
+      return false;
     }
-    return true;
   }
 
   start(onFrame, onSwing) {
-    this._listeners.frame.push(onFrame);
+    if (onFrame) this._listeners.frame.push(onFrame);
     if (onSwing) this._listeners.swing.push(onSwing);
-    if (this._motionHandler) return;
+    if (this.enabled) return;
 
     if (this.forceSim || !window.DeviceMotionEvent || !window.DeviceOrientationEvent) {
       console.warn('[sensor] 使用模拟器 (无陀螺仪/加速度计或 forceSim)');
+      this.enabled = true;
       this._startSimulator();
       return;
     }
@@ -82,7 +89,7 @@ export class Sensor {
       z: (gyro.gamma ?? 0) * DEG,
     };
 
-    // 角速度跳变 >90°/s 视为噪声/翻转, 抑制; 否则用于挥舞检测
+    // 角速度跳变 >300°/s 视为噪声/翻转, 抑制; 否则用于挥舞检测
     const dg = Math.hypot(g.x, g.y, g.z);
     this.omega = (dt > 0 && dt < 0.1 && dg <= JUMP_GUARD * DEG) ? dg : 0;
 
@@ -138,14 +145,18 @@ export class Sensor {
   }
 
   vibrate(strength = 1) {
-    if (navigator.vibrate) {
-      navigator.vibrate(Math.round(10 + Math.min(strength, 1) * 60));
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(Math.round(12 + Math.min(Math.max(strength, 0.1), 1.5) * 55));
+      } catch { /* ignore */ }
     }
   }
 
   stop() {
     if (this._motionHandler) window.removeEventListener('devicemotion', this._motionHandler);
+    if (this._orientationHandler) window.removeEventListener('deviceorientation', this._orientationHandler);
     this._motionHandler = null;
+    this._orientationHandler = null;
     this._stopSimulator();
     this.enabled = false;
     this._listeners = { frame: [], swing: [] };
@@ -161,30 +172,35 @@ export class Sensor {
     let t = 0;
     let lastSwing = 0;
     let boost = 0;
-    // 校准期间(calibrated=false)保持中性姿态(beta=90,gamma=0), 模拟玩家稳定持握对准屏幕中心。
-    // 由 sensor.calibrate() 在采样完成后置 true 恢复挥舞, 故这里不自行计时翻转。
+    const startTs = performance.now();
+    // 校准初段(前 1.2s)保持中性指向屏幕内部 INTO=(0,-1,0) 对应 W3C 欧拉角 (alpha=180, beta=0, gamma=0),
+    // 让 PC 端自动校准基准 mapQ = Identity；随后进入平滑 8 字轨迹挥舞，兼顾手动 ?sim=1 与 e2e 测试。
     this._simTimer = setInterval(() => {
       t += 0.016;
       const now = performance.now();
-      let gamma, beta, omega;
-      if (!this.calibrated) {
-        gamma = 0;
-        beta = 90;
-        omega = 0.3;
-      } else {
-        gamma = Math.sin(t * 1.2) * 55;
-        beta = Math.sin(t * 0.7) * 45 + 90;
-        omega = 1.0 + Math.abs(Math.cos(t * 1.2)) * 1.0;
-        if (now - lastSwing > 1500) {
+      if (!this.calibrated && now - startTs > 1200) {
+        this.calibrated = true;
+      }
+      let alpha = 180;
+      let beta = 0;
+      let gamma = 0;
+      let omega = 0.25;
+
+      if (this.calibrated) {
+        alpha = 180 + Math.sin(t * 1.4) * 22;
+        beta = 4 + Math.sin(t * 0.9) * 14;
+        gamma = Math.cos(t * 1.1) * 18;
+        omega = 1.0 + Math.abs(Math.cos(t * 1.4)) * 1.0;
+        if (now - lastSwing > 1400) {
           boost = 1;
           lastSwing = now;
         }
-        gamma += boost * 60;
-        boost = Math.max(0, boost - 0.1);
-        if (boost > 0.5) omega = SENSOR.SWING_PEAK + 2.5;
+        alpha += boost * 12;
+        boost = Math.max(0, boost - 0.12);
+        if (boost > 0.5) omega = SENSOR.SWING_PEAK + 2.2;
       }
 
-      this.q = qNormalize(quatFromDeviceEuler(0, beta, gamma));
+      this.q = qNormalize(quatFromDeviceEuler(alpha, beta, gamma));
       this.forward = qRotate(this.q, { x: 0, y: 0, z: 1 });
       this.top = qRotate(this.q, { x: 0, y: 1, z: 0 });
       this.omega = omega;

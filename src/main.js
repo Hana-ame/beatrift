@@ -1,5 +1,5 @@
 import './style.css';
-import { bindRoleButtons, parseRoute, navigate, showScreen } from './ui/screens.js';
+import { bindRoleButtons, parseRoute, showScreen } from './ui/screens.js';
 import { VERSION_STR } from './version.js';
 
 document.title = `BeatRift · 体感节奏击打 ${VERSION_STR}`;
@@ -29,7 +29,7 @@ function stopFlow() {
   current.cleanup = null;
 }
 
-bindRoleButtons({ onPc() {}, onMobile() {} });
+bindRoleButtons();
 window.addEventListener('hashchange', route);
 route();
 
