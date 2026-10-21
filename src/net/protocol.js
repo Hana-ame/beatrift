@@ -38,7 +38,11 @@ export function encodeMotion(dir, omega, hit) {
 }
 
 export function decodeMotion(buf) {
-  const f = new Float32Array(buf);
+  const f = new Float32Array(
+    buf instanceof ArrayBuffer
+      ? buf
+      : buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
+  );
   if (f.length < MOTION_FLOATS) return null;
   const x = f[0];
   const y = f[1];

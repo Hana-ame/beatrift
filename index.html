@@ -38,15 +38,25 @@
           <div class="song-row">
             <div class="devices-title">选歌</div>
             <div class="song-btns">
-              <button class="btn btn-small song-btn" data-song="pulse">霓虹脉冲</button>
-              <button class="btn btn-small song-btn" data-song="rush">激光冲刺</button>
-              <button class="btn btn-small song-btn" data-song="void">深空回响</button>
+              <button class="btn btn-small song-btn" data-song="pulse">霓虹脉冲 · 128</button>
+              <button class="btn btn-small song-btn" data-song="rush">激光冲刺 · 150</button>
+              <button class="btn btn-small song-btn" data-song="void">深空回响 · 96</button>
+            </div>
+          </div>
+          <div class="song-row">
+            <div class="devices-title">难度</div>
+            <div class="song-btns">
+              <button class="btn btn-small room-diff-btn" data-diff="easy">简单</button>
+              <button class="btn btn-small room-diff-btn active" data-diff="normal">普通</button>
+              <button class="btn btn-small room-diff-btn" data-diff="hard">困难</button>
+              <button class="btn btn-small room-diff-btn" data-diff="master">大师</button>
             </div>
           </div>
           <div id="pc-devices" class="devices hidden">
             <div class="devices-title">正在等待设备…</div>
           </div>
           <button id="pc-start" class="btn btn-big btn-accent" disabled>开始游戏</button>
+          <button id="pc-solo" class="btn btn-small btn-solo">单机鼠标/触控畅玩 (免手机)</button>
           <button id="pc-back" class="btn btn-small btn-ghost">返回</button>
         </div>
       </section>
@@ -65,12 +75,30 @@
         </div>
       </section>
 
-      <!-- ============ Mobile: 软件即可 ============ -->
+      <!-- ============ Mobile: 遥控界面 ============ -->
       <section id="screen-remote" class="screen hidden">
         <div class="remote-hud">
+          <h2 class="logo remote-logo">BEAT<span>RIFT</span></h2>
           <div id="remote-status" class="remote-status">已连接</div>
           <div id="remote-ping" class="remote-ping">-- ms</div>
+          <div class="remote-stats">
+            <div class="remote-stat-box">
+              <span class="remote-stat-label">得分</span>
+              <b id="remote-score">0</b>
+            </div>
+            <div class="remote-stat-box">
+              <span class="remote-stat-label">连击</span>
+              <b id="remote-combo">0</b>
+            </div>
+            <div class="remote-stat-box">
+              <span class="remote-stat-label">护盾</span>
+              <b id="remote-lives">♥♥♥♥</b>
+            </div>
+          </div>
+          <p class="hint">像握光剑般手持手机，顶边对准屏幕中心即可点击「设为正面」</p>
           <div class="calib-bar">
+            <button id="remote-recalib" class="btn btn-accent">设为正面 (校准)</button>
+            <button id="remote-start" class="btn">开始 / 重开</button>
             <button id="remote-vibrate" class="btn btn-small">震动测试</button>
           </div>
         </div>
@@ -82,7 +110,7 @@
         <div id="calib-overlay" class="calib-overlay hidden">
           <div class="calib-card calib2-card">
             <h2 class="section-title">校准光剑</h2>
-            <p class="hint">像握光剑般手持手机, 手机顶边指向屏幕; 光剑应指向屏幕内部。</p>
+            <p class="hint">像握光剑般手持手机, 手机顶边指向屏幕; 光剑应指向屏幕内部(或直接移动鼠标体验)。</p>
             <div id="calib-song" class="hint calib-song">歌曲: --</div>
             <div class="flip-row">
               <button id="calib-fx" data-flip="x" class="btn btn-small flip-btn">反转左右</button>
@@ -90,31 +118,55 @@
               <button id="calib-fz" data-flip="z" class="btn btn-small flip-btn">反转正反</button>
               <button id="calib-setfront" class="btn btn-small">设为正面</button>
             </div>
-            <div class="diff-row hidden">
+            <div class="diff-row">
               <button class="btn btn-small diff-btn" data-diff="easy">简单</button>
-              <button class="btn btn-small diff-btn" data-diff="normal">普通</button>
+              <button class="btn btn-small diff-btn active" data-diff="normal">普通</button>
               <button class="btn btn-small diff-btn" data-diff="hard">困难</button>
+              <button class="btn btn-small diff-btn" data-diff="master">大师</button>
+            </div>
+            <div class="mode-row">
+              <button id="calib-invincible" class="btn btn-small flip-btn">模式: 闯关挑战</button>
             </div>
             <button id="calib-start" class="btn btn-big btn-accent">光剑 OK · 开始游戏</button>
           </div>
         </div>
         <div id="hud" class="hud hidden">
+          <div class="hud-progress">
+            <div id="hud-progress-fill" class="hud-progress-fill"></div>
+          </div>
           <div class="hud-top">
-            <div class="hud-score">
-              <span id="score">0</span>
-              <span class="hud-label">分</span>
+            <div class="hud-left">
+              <div class="hud-score">
+                <span id="score">0</span>
+                <span class="hud-label">分</span>
+                <span id="hud-mult" class="hud-mult">x1.0</span>
+              </div>
+              <div class="hud-fever-wrap">
+                <span class="hud-fever-label">FEVER</span>
+                <div class="hud-fever-bar">
+                  <div id="hud-fever-fill" class="hud-fever-fill"></div>
+                </div>
+              </div>
             </div>
             <div id="combo" class="hud-combo">0</div>
-            <div class="hud-lives" id="lives">♥♥♥</div>
+            <div class="hud-right-group">
+              <div class="hud-lives" id="lives">♥♥♥♥</div>
+              <div id="hud-song" class="hud-song">霓虹脉冲 · 普通</div>
+            </div>
           </div>
           <div id="hud-acc" class="hud-acc">命中率 --</div>
-          <button id="hud-exit" class="btn btn-small hud-exit">退出</button>
+          <div class="hud-actions">
+            <button id="hud-recalib" class="btn btn-small hud-btn" title="快捷键 R">重校正面</button>
+            <button id="hud-mute" class="btn btn-small hud-btn" title="快捷键 M">🔊 音效</button>
+            <button id="hud-exit" class="btn btn-small hud-exit">退出</button>
+          </div>
           <div id="hud-pop" class="hud-pop hidden"></div>
           <div id="pc-dir" class="pc-dir">dir -- · -- fps</div>
         </div>
         <div id="end-overlay" class="overlay hidden">
           <div class="end-card">
             <h2 id="end-title">游戏结束</h2>
+            <div id="end-rank" class="end-rank">评级 S</div>
             <div id="end-score" class="end-score">0</div>
             <div id="end-stats" class="end-stats"></div>
             <button id="end-replay" class="btn btn-big btn-accent">再来一次</button>

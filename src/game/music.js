@@ -7,14 +7,19 @@ const LOOKAHEAD = 0.12;
 const TIMER_MS = 20;
 
 const F = {
-  A2: 110, A3: 220, A4: 440, C3: 130.81, C4: 261.63, E3: 164.81, E4: 329.63,
-  F2: 87.31, F3: 174.61, F4: 349.23, G2: 98, G3: 196, G4: 392,
-  B3: 246.94, D4: 293.66, D2: 73.42, E2: 82.41, G2b: 92.5, D3: 146.83, A2d: 103.83,
+  A2: 110, A3: 220, A4: 440, A5: 880,
+  C3: 130.81, C4: 261.63, C5: 523.25,
+  E3: 164.81, E4: 329.63, E5: 659.25,
+  F2: 87.31, F3: 174.61, F4: 349.23,
+  G2: 98, G3: 196, G4: 392, G5: 783.99,
+  B3: 246.94, B4: 493.88,
+  D4: 293.66, D5: 587.33,
+  D2: 73.42, E2: 82.41, G2b: 92.5, D3: 146.83, A2d: 103.83,
 };
 
 const PENTA = [F.A3, F.C4, F.D4, F.E4, F.G4, F.A4, 0, F.G4, F.E4, F.D4, F.C4, F.A3];
-const PENTA_DARK = [F.A3, F.C4, F.E4, F.G3, F.B3, F.D4, 0, F.D4, F.B3, F.G3, F.E4, F.C4];
-const PENTA_DEEP = [F.D3, F.F3, F.A3, F.C4, F.E4, 0, F.E4, F.C4, F.A3, F.F3, F.D3];
+const PENTA_DARK = [F.A3, F.C4, F.E4, F.G4, F.B4, F.E5, 0, F.D4, F.B3, F.G3, F.E4, F.C4];
+const PENTA_DEEP = [F.D3, F.F3, F.A3, F.C4, F.E4, F.A4, 0, F.E4, F.C4, F.A3, F.F3, F.D3];
 
 // 三首歌 = 三种合成风格, 每首有独立的和声/旋律/节奏密度
 const STYLES = {
@@ -27,7 +32,7 @@ const STYLES = {
     ],
     penta: PENTA,
     hatEvery: 2,       // 16分step里每几个一踩(2=半拍)
-    arpDensity: [1, 1, 2, 2],
+    arpDensity: [1, 2, 2, 4],
     bassEvery: 2,
     bassOctave: 0,
   },
@@ -39,8 +44,8 @@ const STYLES = {
       [F.G2, F.G3, F.B3, F.D4],
     ],
     penta: PENTA_DARK,
-    hatEvery: 1,       // 16分踩镲, 更碎
-    arpDensity: [2, 2, 3, 3],
+    hatEvery: 1,       // 16分踩镲, 更疾速
+    arpDensity: [2, 2, 4, 4],
     bassEvery: 2,
     bassOctave: 1,
   },
@@ -52,8 +57,8 @@ const STYLES = {
       [F.C3, F.C4, F.E4, F.G4],
     ],
     penta: PENTA_DEEP,
-    hatEvery: 4,       // 稀疏
-    arpDensity: [0, 1, 1, 2],
+    hatEvery: 4,       // 稀疏空灵
+    arpDensity: [1, 1, 2, 2],
     bassEvery: 4,
     bassOctave: 0,
   },
@@ -67,10 +72,13 @@ function buildPattern(styleName) {
   for (let bar = 0; bar < BARS; bar++) {
     const base = bar * STEPS_PER_BAR;
 
+    // 铺底和弦 Pad (每小节首拍)
+    step(base, { type: 'pad', notes: st.chords[bar].slice(1) });
+
     for (let s = 0; s < STEPS_PER_BAR; s++) {
-      // 四踩底鼓 + 填充
+      // 四踩底鼓 + 过门填充
       if (s % 4 === 0) step(base + s, { type: 'kick' });
-      if (bar === 3 && s === 14) step(base + s, { type: 'kick' });
+      if (bar === 3 && (s === 14 || s === 15)) step(base + s, { type: 'kick' });
 
       // 军鼓 on 2 & 4
       if (s === 4 || s === 12) step(base + s, { type: 'snare' });
@@ -86,11 +94,15 @@ function buildPattern(styleName) {
       step(base + s, { type: 'bass', note: s % 4 === 2 ? fifth : root });
     }
 
-    // 琶音旋律
+    // 琶音旋律 (修复原版 4/density 浮点取模失效与 density=0 Infinity 取模 bug)
     const density = st.arpDensity[Math.min(bar, st.arpDensity.length - 1)];
-    for (let s = 0; s < STEPS_PER_BAR; s++) {
-      if (s % Math.max(1, 4 / density) === 0 && Math.random() < 0.85) {
-        step(base + s, { type: 'arp', note: st.penta[(s + bar * 3) % st.penta.length], bar });
+    if (density > 0) {
+      const stride = Math.max(1, Math.floor(4 / density));
+      for (let s = 0; s < STEPS_PER_BAR; s += stride) {
+        if ((s + bar) % 7 !== 5) {
+          const note = st.penta[(s + bar * 3) % st.penta.length];
+          if (note) step(base + s, { type: 'arp', note, bar });
+        }
       }
     }
   }
@@ -118,10 +130,7 @@ export class Music {
     this._songSource = null;
   }
 
-  start({ onStep, onBar } = {}) {
-    this._onStep = onStep || null;
-    this._onBar = onBar || null;
-
+  _ensureCtx() {
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AC({ latencyHint: 'interactive' });
@@ -129,7 +138,17 @@ export class Music {
       this.master.gain.value = this.muted ? 0 : 0.9;
       this.master.connect(this.ctx.destination);
     }
-    if (this.ctx.state !== 'running') this.ctx.resume();
+    if (this.ctx.state !== 'running') {
+      try { this.ctx.resume(); } catch { /* ignore */ }
+    }
+  }
+
+  start({ onStep, onBar } = {}) {
+    this.stop();
+    this._onStep = onStep || null;
+    this._onBar = onBar || null;
+
+    this._ensureCtx();
 
     this.started = true;
     this._nextStep = 0;
@@ -152,13 +171,7 @@ export class Music {
   // 在线下载/外链方式加载并解码歌曲; 失败返回 false, 调用方回退合成
   async loadSong(url) {
     this.songUrl = url;
-    if (!this.ctx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AC({ latencyHint: 'interactive' });
-      this.master = this.ctx.createGain();
-      this.master.gain.value = this.muted ? 0 : 0.9;
-      this.master.connect(this.ctx.destination);
-    }
+    this._ensureCtx();
     try {
       const res = await fetch(url, { mode: 'cors' });
       if (!res.ok) throw new Error(`song fetch ${res.status}`);
@@ -176,12 +189,35 @@ export class Music {
   stop() {
     if (this._timer) clearInterval(this._timer);
     this._timer = null;
+    if (this._songSource) {
+      try {
+        this._songSource.stop();
+        this._songSource.disconnect();
+      } catch { /* ignore */ }
+      this._songSource = null;
+    }
     this.started = false;
   }
 
+  dispose() {
+    this.stop();
+    if (this.ctx && this.ctx.state !== 'closed') {
+      try { this.ctx.close(); } catch { /* ignore */ }
+    }
+    this.ctx = null;
+    this.master = null;
+  }
+
   setMuted(m) {
-    this.muted = m;
-    if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.03);
+    this.muted = !!m;
+    if (this.master && this.ctx) {
+      this.master.gain.setTargetAtTime(this.muted ? 0 : 0.9, this.ctx.currentTime, 0.03);
+    }
+  }
+
+  toggleMuted() {
+    this.setMuted(!this.muted);
+    return this.muted;
   }
 
   beatFromTime(t) {
@@ -201,8 +237,84 @@ export class Music {
     return this.ctx ? this.stepFromTime(this.ctx.currentTime) : 0;
   }
 
+  // 实时打击音效反馈
+  playHit(grade = 'perfect', noteType = 'normal', fever = false) {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+
+    // 光剑挥砍空气高频泛音
+    const n = this.ctx.createBufferSource();
+    n.buffer = this._noiseBuf();
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(grade === 'perfect' ? 3200 : 2200, t);
+    bp.Q.value = 1.6;
+    const ng = this.ctx.createGain();
+    n.connect(bp).connect(ng).connect(this.master);
+    this._env(ng, t, 0.002, 0.065, grade === 'perfect' ? 0.36 : 0.24);
+    n.start(t);
+    n.stop(t + 0.08);
+
+    // 水晶碎裂清脆音高
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = fever || noteType === 'gold' ? 'triangle' : 'sine';
+    const baseFreq = noteType === 'gold' ? F.A5 : noteType === 'chain' ? F.G5 : grade === 'perfect' ? F.E5 : F.C5;
+    o.frequency.setValueAtTime(baseFreq, t);
+    o.frequency.exponentialRampToValueAtTime(baseFreq * 1.45, t + 0.075);
+    o.connect(g).connect(this.master);
+    this._env(g, t, 0.002, 0.09, noteType === 'gold' ? 0.34 : 0.22);
+    o.start(t);
+    o.stop(t + 0.11);
+  }
+
+  playMiss(isBomb = false) {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = isBomb ? 'sawtooth' : 'triangle';
+    o.frequency.setValueAtTime(isBomb ? 150 : 190, t);
+    o.frequency.exponentialRampToValueAtTime(isBomb ? 42 : 75, t + 0.18);
+    o.connect(g).connect(this.master);
+    this._env(g, t, 0.003, 0.2, isBomb ? 0.45 : 0.28);
+    o.start(t);
+    o.stop(t + 0.24);
+  }
+
+  playFever() {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    [F.A4, F.C5, F.E5, F.A5].forEach((freq, idx) => {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(freq, t + idx * 0.045);
+      o.connect(g).connect(this.master);
+      this._env(g, t + idx * 0.045, 0.005, 0.22, 0.22);
+      o.start(t + idx * 0.045);
+      o.stop(t + idx * 0.045 + 0.26);
+    });
+  }
+
+  playClear(cleared = true) {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    const notes = cleared ? [F.C4, F.E4, F.G4, F.C5, F.E5] : [F.E4, F.D4, F.C4, F.A3];
+    notes.forEach((freq, idx) => {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(freq, t + idx * 0.08);
+      o.connect(g).connect(this.master);
+      this._env(g, t + idx * 0.08, 0.008, 0.32, 0.25);
+      o.start(t + idx * 0.08);
+      o.stop(t + idx * 0.08 + 0.36);
+    });
+  }
+
   _tick() {
-    if (!this.started) return;
+    if (!this.started || !this.ctx) return;
     while (this._nextTime < this.ctx.currentTime + LOOKAHEAD) {
       this._scheduleStep(this._nextStep, this._nextTime);
       const wasBarStart = this._nextStep % STEPS_PER_BAR === 0;
@@ -224,6 +336,7 @@ export class Music {
         case 'hat-open': this._hat(t, true); break;
         case 'bass': this._bass(t, e.note); break;
         case 'arp': this._arp(t, e.note); break;
+        case 'pad': this._pad(t, e.notes); break;
       }
     }
   }
@@ -231,7 +344,7 @@ export class Music {
   _env(node, t, a, d, peak) {
     const g = node.gain;
     g.setValueAtTime(0.0001, t);
-    g.exponentialRampToValueAtTime(peak, t + a);
+    g.exponentialRampToValueAtTime(Math.max(0.001, peak), t + a);
     g.exponentialRampToValueAtTime(0.0001, t + a + d);
   }
 
@@ -242,7 +355,7 @@ export class Music {
     o.frequency.setValueAtTime(160, t);
     o.frequency.exponentialRampToValueAtTime(45, t + 0.11);
     o.connect(g).connect(this.master);
-    this._env(g, t, 0.002, 0.13, 1.0);
+    this._env(g, t, 0.002, 0.13, 0.95);
     o.start(t);
     o.stop(t + 0.19);
   }
@@ -256,7 +369,7 @@ export class Music {
     bp.Q.value = 0.8;
     const g = this.ctx.createGain();
     n.connect(bp).connect(g).connect(this.master);
-    this._env(g, t, 0.002, 0.16, 0.7);
+    this._env(g, t, 0.002, 0.16, 0.65);
     n.start(t);
     n.stop(t + 0.22);
 
@@ -266,7 +379,7 @@ export class Music {
     o.frequency.setValueAtTime(220, t);
     o.frequency.exponentialRampToValueAtTime(150, t + 0.06);
     o.connect(og).connect(this.master);
-    this._env(og, t, 0.002, 0.07, 0.5);
+    this._env(og, t, 0.002, 0.07, 0.45);
     o.start(t);
     o.stop(t + 0.12);
   }
@@ -279,7 +392,7 @@ export class Music {
     hp.frequency.value = open ? 6500 : 8500;
     const g = this.ctx.createGain();
     n.connect(hp).connect(g).connect(this.master);
-    this._env(g, t, 0.001, open ? 0.25 : 0.05, open ? 0.35 : 0.3);
+    this._env(g, t, 0.001, open ? 0.25 : 0.05, open ? 0.32 : 0.26);
     n.start(t);
     n.stop(t + (open ? 0.32 : 0.09));
   }
@@ -289,13 +402,13 @@ export class Music {
     const o = this.ctx.createOscillator();
     const lpf = this.ctx.createBiquadFilter();
     const g = this.ctx.createGain();
-    o.type = 'square';
+    o.type = 'sawtooth';
     o.frequency.value = freq;
     lpf.type = 'lowpass';
-    lpf.frequency.setValueAtTime(1200, t);
-    lpf.frequency.exponentialRampToValueAtTime(250, t + 0.09);
+    lpf.frequency.setValueAtTime(1250, t);
+    lpf.frequency.exponentialRampToValueAtTime(240, t + 0.09);
     o.connect(lpf).connect(g).connect(this.master);
-    this._env(g, t, 0.004, 0.18, 0.5);
+    this._env(g, t, 0.004, 0.18, 0.44);
     o.start(t);
     o.stop(t + 0.24);
   }
@@ -310,6 +423,22 @@ export class Music {
     this._env(g, t, 0.005, 0.14, 0.18);
     o.start(t);
     o.stop(t + 0.2);
+  }
+
+  _pad(t, freqs) {
+    if (!Array.isArray(freqs)) return;
+    const dur = (60 / this.bpm) * 3.8;
+    for (const freq of freqs) {
+      if (!isFinite(freq)) continue;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      o.connect(g).connect(this.master);
+      this._env(g, t, 0.12, dur, 0.06);
+      o.start(t);
+      o.stop(t + dur + 0.15);
+    }
   }
 
   _noiseBuf() {

@@ -9,7 +9,11 @@ export function isConnected() {
 }
 
 export function connect({ timeout = 6000, retries = 1 } = {}) {
-  if (client) return Promise.resolve(isConnected());
+  if (client && client.connected) return Promise.resolve(true);
+  if (client) {
+    try { client.end(true); } catch { /* noop */ }
+    client = null;
+  }
   const attempt = (n) => new Promise((resolve) => {
     const opts = {
       clientId: `beatrift-${Math.random().toString(36).slice(2, 10)}`,
@@ -39,10 +43,11 @@ export function connect({ timeout = 6000, retries = 1 } = {}) {
 }
 
 export function pcAnnounce(roomCode, peerId) {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
   const topic = `${MQTT.ROOM_TOPIC}/${roomCode}`;
-  const beat = { roomCode, peerId, ts: Date.now() };
   const publish = () => {
     if (!isConnected()) return;
+    const beat = { roomCode, peerId, ts: Date.now() };
     client.publish(topic, JSON.stringify(beat), { qos: 0, retain: false });
   };
   publish();
@@ -67,8 +72,10 @@ export function subscribeRooms(handler) {
   };
   client.on('message', onMessage);
   return () => {
-    client.unsubscribe(topic);
-    client.off('message', onMessage);
+    try {
+      client?.unsubscribe(topic);
+      client?.off('message', onMessage);
+    } catch { /* ignore */ }
   };
 }
 
